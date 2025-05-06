@@ -1,53 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>IESO CSV Data Viewer</title>
+  <title>IESO LMP CSV Filtered View</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; }
+    th { background-color: #f2f2f2; }
+  </style>
 </head>
 <body>
   <h1>IESO DA Hourly Energy LMP Data</h1>
-  <table border="1" id="data-table">
+  <p><strong>Filtered to show only: GSPC-LT.G1 and GSPC-LT.G2</strong></p>
+
+  <table id="csv-table">
     <thead></thead>
     <tbody></tbody>
   </table>
 
   <script>
-    const csvUrl = 'https://reports-public.ieso.ca/public/DAHourlyEnergyLMP/PUB_DAHourlyEnergyLMP.csv';
+    fetch('PUB_DAHourlyEnergyLMP.csv') // Ensure this CSV is in the same folder
+      .then(res => res.text())
+      .then(csv => {
+        const lines = csv.trim().split('\n');
+        const rows = lines.map(line => line.split(','));
+        const headers = rows[0];
+        const nameIndex = headers.indexOf('Name');
 
-    fetch(csvUrl)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+        if (nameIndex === -1) {
+          throw new Error("Couldn't find 'Name' column in CSV.");
         }
-        return response.text();
-      })
-      .then(csvText => {
-        const rows = csvText.trim().split('\n').map(row => row.split(','));
-        const table = document.getElementById('data-table');
-        const thead = table.querySelector('thead');
-        const tbody = table.querySelector('tbody');
 
-        // Insert header
+        const filteredRows = [headers, ...rows.slice(1).filter(row =>
+          row[nameIndex] === 'GSPC-LT.G1' || row[nameIndex] === 'GSPC-LT.G2'
+        )];
+
+        const tableHead = document.querySelector('#csv-table thead');
+        const tableBody = document.querySelector('#csv-table tbody');
+
+        // Render header
         const headerRow = document.createElement('tr');
-        rows[0].forEach(header => {
+        headers.forEach(col => {
           const th = document.createElement('th');
-          th.textContent = header;
+          th.textContent = col;
           headerRow.appendChild(th);
         });
-        thead.appendChild(headerRow);
+        tableHead.appendChild(headerRow);
 
-        // Insert data rows
-        for (let i = 1; i < rows.length; i++) {
-          const row = document.createElement('tr');
-          rows[i].forEach(cell => {
+        // Render rows
+        filteredRows.slice(1).forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell;
-            row.appendChild(td);
+            tr.appendChild(td);
           });
-          tbody.appendChild(row);
-        }
+          tableBody.appendChild(tr);
+        });
       })
-      .catch(error => {
-        console.error('Error loading CSV:', error);
+      .catch(err => {
+        console.error('Error loading or parsing CSV:', err);
+        document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error: ' + err.message + '</p>');
       });
   </script>
 </body>
