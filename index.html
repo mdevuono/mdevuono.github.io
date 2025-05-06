@@ -103,8 +103,9 @@
           return;
         }
 
+        // Filter only for GSPC-LT.G1
         const filteredRows = [headers, ...rows.filter(row =>
-          row[pricingIndex] === 'GSPC-LT.G1' || row[pricingIndex] === 'GSPC-LT.G2'
+          row[pricingIndex] === 'GSPC-LT.G1'
         )];
 
         const tableHead = document.querySelector('#csv-table thead');
