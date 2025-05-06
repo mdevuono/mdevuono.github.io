@@ -43,6 +43,10 @@
       margin-top: 25px;
       display: none;
     }
+    .highlight-he {
+      background-color: #fffae6; /* light yellow */
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -123,7 +127,7 @@
         he = hour + 1;
       }
       if (he === 25) he = 1; // just in case of overflow
-      document.getElementById('iesoTimeHeader').textContent = 'IESO Time (HE): HE: ' + he;
+      document.getElementById('iesoTimeHeader').textContent = 'IESO Time (HE): ' + he;
     }
 
     updateTimeDisplays();
@@ -159,8 +163,9 @@
         const headers = lines[1].split(',');
         const rows = lines.slice(2).map(line => line.split(','));
         const pricingIndex = headers.indexOf('Pricing Location');
-        if (pricingIndex === -1) {
-          alert("Couldn't find 'Pricing Location' column in CSV.");
+        const deliveryHourIndex = headers.indexOf('Delivery Hour'); // Updated header
+        if (pricingIndex === -1 || deliveryHourIndex === -1) {
+          alert("Couldn't find 'Pricing Location' or 'Delivery Hour' columns in CSV.");
           return;
         }
 
@@ -178,13 +183,25 @@
         });
         tableHead.appendChild(headerRow);
 
+        // Highlight the matching Delivery Hour row
+        const currentHEText = document.getElementById('iesoTimeHeader').textContent;  // Get the full text
+        const currentHE = parseInt(currentHEText.split(':')[1].trim()); // Extract the hour (after 'HE:')
+
         filteredRows.slice(1).forEach(row => {
           const tr = document.createElement('tr');
+          const deliveryHour = parseInt(row[deliveryHourIndex].trim()); // Ensure it's an integer
+
           row.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell;
             tr.appendChild(td);
           });
+
+          // Add highlight if the row matches the current HE
+          if (deliveryHour === currentHE) {
+            tr.classList.add('highlight-he');
+          }
+
           tableBody.appendChild(tr);
         });
 
