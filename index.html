@@ -5,14 +5,19 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { font-size: 24px; }
-    a.download-link {
+    .download-link {
       display: inline-block;
       background-color: #007acc;
       color: white;
       padding: 10px 15px;
       text-decoration: none;
       border-radius: 5px;
-      margin-bottom: 10px;
+      margin-top: 10px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      margin-top: 5px;
+      width: 200px;
     }
     table {
       border-collapse: collapse;
@@ -34,15 +39,21 @@
 </head>
 <body>
   <h1>IESO DA Hourly Energy LMP Viewer</h1>
+  
   <p>
-    🔽 <strong>Step 1:</strong> Download the latest CSV file from IESO:<br>
-    <a class="download-link" href="https://reports-public.ieso.ca/public/DAHourlyEnergyLMP/PUB_DAHourlyEnergyLMP.csv" download>
-      Download PUB_DAHourlyEnergyLMP.csv
-    </a>
+    🔽 <strong>Step 1:</strong> Enter the date (YYYYMMDD) for which you want to download the CSV file:
+  </p>
+  <input type="text" id="dateInput" placeholder="YYYYMMDD" />
+  <button id="generateDownloadLink">Generate Download Link</button>
+
+  <p id="downloadMessage" style="display: none;">
+    📁 <strong>Step 2:</strong> Download the CSV for the selected date:
+    <br>
+    <a id="downloadLink" class="download-link" href="#" target="_blank">Download CSV</a>
   </p>
 
   <p>
-    📁 <strong>Step 2:</strong> After downloading, select the CSV file from your Downloads folder:
+    📁 <strong>Step 3:</strong> After downloading, select the CSV file from your Downloads folder:
   </p>
   <input type="file" id="csvFile" accept=".csv" />
 
@@ -52,6 +63,27 @@
   </table>
 
   <script>
+    // Set the default date to today's date (YYYYMMDD format)
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD format
+    document.getElementById('dateInput').value = formattedDate;
+
+    document.getElementById('generateDownloadLink').addEventListener('click', function () {
+      const date = document.getElementById('dateInput').value;
+      const dateRegex = /^\d{8}$/; // YYYYMMDD format
+      if (!date.match(dateRegex)) {
+        alert("Please enter a valid date in the format YYYYMMDD.");
+        return;
+      }
+      
+      const fileUrl = `https://reports-public.ieso.ca/public/DAHourlyEnergyLMP/PUB_DAHourlyEnergyLMP_${date}.csv`;
+      const downloadLink = document.getElementById('downloadLink');
+      downloadLink.href = fileUrl;
+      
+      // Show download link
+      document.getElementById('downloadMessage').style.display = 'block';
+    });
+
     document.getElementById('csvFile').addEventListener('change', function (event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -63,7 +95,6 @@
         
         // Headers are in the second row (index 1)
         const headers = lines[1].split(',');
-
         const rows = lines.slice(2).map(line => line.split(',')); // Skip the first row
         const pricingIndex = headers.indexOf('Pricing Location');
 
