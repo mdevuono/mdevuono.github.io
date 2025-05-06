@@ -5,6 +5,7 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { font-size: 24px; }
+    h3, h4 { font-size: 18px; color: #444; margin: 5px 0; }
     .download-link {
       display: inline-block;
       background-color: #007acc;
@@ -46,7 +47,9 @@
 </head>
 <body>
   <h1>IESO DA and Predispatch LMP Viewer</h1>
-  
+  <h3 id="currentTimeHeader">Current EPT Time: --</h3>
+  <h4 id="iesoTimeHeader">IESO Time (HE): --</h4>
+
   <p>
     🔽 <strong>Step 1:</strong> Enter the date (YYYYMMDD) to download the CSV files:
   </p>
@@ -88,6 +91,43 @@
     const today = new Date();
     const formattedDate = today.toISOString().split('T')[0].replace(/-/g, '');
     document.getElementById('dateInput').value = formattedDate;
+
+    function updateTimeDisplays() {
+      const now = new Date();
+
+      // EPT (Eastern Time with daylight saving)
+      const eptOptions = {
+        timeZone: 'America/Toronto',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      };
+      const eptFormatter = new Intl.DateTimeFormat('en-US', eptOptions);
+      document.getElementById('currentTimeHeader').textContent = 'Current EPT Time: ' + eptFormatter.format(now);
+
+      // IESO Time (always EST, UTC-5, no daylight savings)
+      const utcMillis = now.getTime() + now.getTimezoneOffset() * 60000;
+      const estMillis = utcMillis - (5 * 60 * 60000); // UTC-5
+      const estDate = new Date(estMillis);
+      let hour = estDate.getHours();
+      let minute = estDate.getMinutes();
+      let he = hour + 1;
+      if (minute === 0) {
+        he = hour + 1; // still round up from 00
+      } else {
+        he = hour + 1;
+      }
+      if (he === 25) he = 1; // just in case of overflow
+      document.getElementById('iesoTimeHeader').textContent = 'IESO Time (HE): HE: ' + he;
+    }
+
+    updateTimeDisplays();
+    setInterval(updateTimeDisplays, 1000);
 
     document.getElementById('generateDownloadLinks').addEventListener('click', function () {
       const date = document.getElementById('dateInput').value;
