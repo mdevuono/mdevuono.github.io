@@ -1,39 +1,213 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-  <title>IESO LMP CSV Viewer (via CORS Proxy)</title>
+  <title>IESO LMP Viewer</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; }
-    th { background-color: #f2f2f2; }
+    h1 { font-size: 24px; }
+    h3, h4 { font-size: 18px; color: #444; margin: 5px 0; }
+    .download-link {
+      display: inline-block;
+      background-color: #007acc;
+      color: white;
+      padding: 10px 15px;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 5px 0;
+    }
+    input[type="text"] {
+      padding: 8px;
+      margin-top: 5px;
+      width: 200px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    input[type="file"] {
+      margin-top: 10px;
+    }
+    h2 {
+      margin-top: 30px;
+    }
+    .section {
+      margin-top: 25px;
+      display: none;
+    }
+    .highlight-he {
+      background-color: #fffae6; /* light yellow */
+      font-weight: bold;
+    }
+    .warning {
+      color: red;
+      font-size: 14px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>IESO DA Hourly Energy LMP Data</h1>
-  <p><em>Loaded using a public CORS proxy.</em></p>
-  <table id="csv-table">
-    <thead></thead>
-    <tbody></tbody>
-  </table>
+  <h1>IESO DA and Predispatch LMP Viewer</h1>
+  <h3 id="currentTimeHeader">Current EPT Time: --</h3>
+  <h4 id="iesoTimeHeader">IESO Time (HE): --</h4>
+
+  <p>
+    🔽 <strong>Step 1:</strong> Enter the date (YYYYMMDD) to download the CSV files:
+  </p>
+  <input type="text" id="dateInput" placeholder="YYYYMMDD" />
+  <button id="generateDownloadLinks">Generate Download Links</button>
+
+  <div id="downloadSection" style="display: none;">
+    <p>
+      📁 <strong>Step 2:</strong> Download one or both CSV files:
+    </p>
+    <a id="daDownloadLink" class="download-link" href="#" target="_blank">Download DA LMP CSV</a><br>
+    <a id="predispDownloadLink" class="download-link" href="#" target="_blank">Download Predispatch LMP CSV</a>
+  </div>
+
+  <div class="section">
+    <p>📁 <strong>Step 3:</strong> Upload the CSV files you downloaded:</p>
+    <p>DA LMP File: <input type="file" id="daCsvFile" accept=".csv" /></p>
+    <p>Predispatch LMP File: <input type="file" id="predispCsvFile" accept=".csv" /></p>
+    <p id="warningMessage" class="warning"></p>
+  </div>
+
+  <div id="daSection" class="section">
+    <h2>DA Hourly Energy LMP (GSPC-LT.G1)</h2>
+    <table id="da-table">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="predispSection" class="section">
+    <h2>Predispatch Hourly Energy LMP (GSPC-LT.G1)</h2>
+    <table id="predisp-table">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
-    const proxy = 'https://corsproxy.io/?';
-    const targetUrl = 'https://reports-public.ieso.ca/public/DAHourlyEnergyLMP/PUB_DAHourlyEnergyLMP.csv';
+    // Set today's date as default
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0].replace(/-/g, '');
+    document.getElementById('dateInput').value = formattedDate;
 
-    fetch(proxy + encodeURIComponent(targetUrl))
-      .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.text();
-      })
-      .then(csv => {
+    // Update time displays
+    function updateTimeDisplays() {
+      const now = new Date();
+
+      // EPT (Eastern Time with daylight saving)
+      const eptOptions = {
+        timeZone: 'America/Toronto',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      };
+      const eptFormatter = new Intl.DateTimeFormat('en-US', eptOptions);
+      document.getElementById('currentTimeHeader').textContent = 'Current EPT Time: ' + eptFormatter.format(now);
+
+      // IESO Time (always EST, UTC-5, no daylight savings)
+      const utcMillis = now.getTime() + now.getTimezoneOffset() * 60000;
+      const estMillis = utcMillis - (5 * 60 * 60000); // UTC-5
+      const estDate = new Date(estMillis);
+      let hour = estDate.getHours();
+      let minute = estDate.getMinutes();
+      let he = hour + 1;
+      if (minute === 0) {
+        he = hour + 1; // still round up from 00
+      } else {
+        he = hour + 1;
+      }
+      if (he === 25) he = 1; // just in case of overflow
+      document.getElementById('iesoTimeHeader').textContent = 'IESO Time (HE): ' + he;
+    }
+
+    updateTimeDisplays();
+    setInterval(updateTimeDisplays, 1000);
+
+    document.getElementById('generateDownloadLinks').addEventListener('click', function () {
+      const date = document.getElementById('dateInput').value;
+      const dateRegex = /^\d{8}$/;
+      if (!date.match(dateRegex)) {
+        alert("Please enter a valid date in YYYYMMDD format.");
+        return;
+      }
+
+      const daUrl = `https://reports-public.ieso.ca/public/DAHourlyEnergyLMP/PUB_DAHourlyEnergyLMP_${date}.csv`;
+      const predispUrl = `https://reports-public.ieso.ca/public/PredispHourlyEnergyLMP/PUB_PredispHourlyEnergyLMP_${date}.csv`;
+
+      document.getElementById('daDownloadLink').href = daUrl;
+      document.getElementById('predispDownloadLink').href = predispUrl;
+      document.getElementById('downloadSection').style.display = 'block';
+      document.querySelectorAll('.section').forEach(el => el.style.display = 'block');
+    });
+
+    // File upload logic
+    function validateFile(fileInput, expectedPrefix) {
+      const file = fileInput.files[0];
+      const fileName = file.name;
+      const warningMessage = document.getElementById('warningMessage');
+
+      // Check if the file name starts with the expected prefix
+      if (!fileName.startsWith(expectedPrefix)) {
+        warningMessage.textContent = `Warning: The file name should start with "${expectedPrefix}". You selected: ${fileName}`;
+      } else {
+        warningMessage.textContent = ''; // Clear warning if the filename matches
+      }
+    }
+
+    document.getElementById('daCsvFile').addEventListener('change', function (e) {
+      validateFile(e.target, 'PUB_DAHourlyEnergyLMP');
+      handleCsvFile(e.target.files[0], 'da-table', 'daSection');
+    });
+
+    document.getElementById('predispCsvFile').addEventListener('change', function (e) {
+      validateFile(e.target, 'PUB_PredispHourlyEnergyLMP');
+      handleCsvFile(e.target.files[0], 'predisp-table', 'predispSection');
+    });
+
+    // Handle CSV file and display the table
+    function handleCsvFile(file, tableId, sectionId) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const csv = e.target.result;
         const lines = csv.trim().split('\n');
-        const headers = lines[0].split(',');
+        if (lines.length < 3) {
+          alert("CSV format is incorrect or too short.");
+          return;
+        }
 
-        const tableHead = document.querySelector('#csv-table thead');
-        const tableBody = document.querySelector('#csv-table tbody');
+        const headers = lines[1].split(',');
+        const rows = lines.slice(2).map(line => line.split(','));
+        const pricingIndex = headers.indexOf('Pricing Location');
+        const deliveryHourIndex = headers.indexOf('Delivery Hour'); // Updated header
+        if (pricingIndex === -1 || deliveryHourIndex === -1) {
+          alert("Couldn't find 'Pricing Location' or 'Delivery Hour' columns in CSV.");
+          return;
+        }
 
-        // Header row
+        const filteredRows = [headers, ...rows.filter(row => row[pricingIndex] === 'GSPC-LT.G1')];
+        const tableHead = document.querySelector(`#${tableId} thead`);
+        const tableBody = document.querySelector(`#${tableId} tbody`);
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '';
+
         const headerRow = document.createElement('tr');
         headers.forEach(col => {
           const th = document.createElement('th');
@@ -42,22 +216,33 @@
         });
         tableHead.appendChild(headerRow);
 
-        // Data rows
-        for (let i = 1; i < lines.length; i++) {
-          const row = lines[i].split(',');
+        // Highlight the matching Delivery Hour row
+        const currentHE = parseInt(document.getElementById('iesoTimeHeader').textContent.split(':')[1].trim());
+
+        filteredRows.slice(1).forEach(row => {
           const tr = document.createElement('tr');
+          const deliveryHour = parseInt(row[deliveryHourIndex]);
+
           row.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell;
             tr.appendChild(td);
           });
+
+          // Add highlight if the row matches the current HE
+          if (deliveryHour === currentHE) {
+            tr.classList.add('highlight-he');
+          }
+
           tableBody.appendChild(tr);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load CSV:', err);
-        document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading CSV: ' + err.message + '</p>');
-      });
+        });
+
+        // Show the section once the file is processed
+        document.getElementById(sectionId).style.display = 'block';
+      };
+
+      reader.readAsText(file);
+    }
   </script>
 </body>
 </html>
